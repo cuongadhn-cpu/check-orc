@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin – Quản lý dây chuyền</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: auto;
+      padding: 20px;
+    }
+
+    label, input, textarea, select, button {
+      display: block;
+      width: 100%;
+      margin-top: 10px;
+      font-size: 1rem;
+    }
+
+    input, textarea {
+      padding: 8px;
+      box-sizing: border-box;
+    }
+
+    button {
+      padding: 10px;
+      cursor: pointer;
+    }
+
+    .line {
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 10px;
+      position: relative;
+      background-color: #f9f9f9;
+      border-radius: 8px;
+    }
+
+    .edit-box {
+      margin-top: 8px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .edit-box button {
+      flex: 1 1 auto;
+    }
+
+    .img-box {
+      margin-top: 10px;
+      position: relative;
+      background-color: #fafafa;
+      border-radius: 6px;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    .img-box img {
+      width: 100%;
+      max-height: 300px;
+      object-fit: contain;
+      margin-top: 10px;
+      border-radius: 4px;
+    }
+
+    .delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: red;
+  color: white;
+  border: none;
+  padding: 2px 6px;
+  font-size: 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  z-index: 10;
+  opacity: 0.8;
+}
+
+
+    @media (max-width: 600px) {
+      body {
+        padding: 15px;
+      }
+
+      h2, h3 {
+        font-size: 1.2rem;
+      }
+
+      label, input, textarea, button {
+        font-size: 1rem;
+      }
+
+      .img-box img {
+        max-height: 200px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h2>🔐 Quản lý dây chuyền</h2>
+
+  <div id="loginSection">
+    <label>Nhập mật khẩu Admin:</label>
+    <input type="password" id="adminPassword">
+    <button onclick="checkLogin()">Đăng nhập</button>
+  </div>
+
+  <div id="adminPanel" style="display:none;">
+    <label>Tên dây chuyền mới:</label>
+    <input type="text" id="lineName" placeholder="Ví dụ: Dây chuyền A">
+
+    <label>Văn bản mẫu cần quét (cách nhau bằng dấu phẩy):</label>
+    <textarea id="lineText" rows="3"></textarea>
+
+    <button onclick="addLine()">➕ Thêm dây chuyền</button>
+
+    <h3>Danh sách dây chuyền:</h3>
+    <div id="lineList"></div>
+
+    <h3>Kết quả PASS đã lưu:</h3>
+    <div id="passResults"></div>
+  </div>
+
+  <script>
+    const PASSWORD = "admin123";
+
+    function checkLogin() {
+      const pw = document.getElementById('adminPassword').value;
+      if (pw === PASSWORD) {
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('adminPanel').style.display = 'block';
+        loadLines();
+        loadPassResults();
+      } else {
+        alert("Sai mật khẩu!");
+      }
+    }
+
+    function addLine() {
+      const name = document.getElementById('lineName').value.trim();
+      const text = document.getElementById('lineText').value.trim();
+      if (!name || !text) {
+        alert("Vui lòng nhập đủ thông tin.");
+        return;
+      }
+      const data = JSON.parse(localStorage.getItem('lines') || '{}');
+      data[name] = text;
+      localStorage.setItem('lines', JSON.stringify(data));
+      document.getElementById('lineName').value = '';
+      document.getElementById('lineText').value = '';
+      loadLines();
+    }
+
+    function deleteLine(line) {
+      const data = JSON.parse(localStorage.getItem('lines') || '{}');
+      delete data[line];
+      localStorage.setItem('lines', JSON.stringify(data));
+      loadLines();
+    }
+
+    function editLine(line) {
+      const newText = prompt("Nhập văn bản mẫu mới cho '" + line + "'", getLines()[line]);
+      if (newText !== null) {
+        const data = getLines();
+        data[line] = newText.trim();
+        localStorage.setItem('lines', JSON.stringify(data));
+        loadLines();
+      }
+    }
+
+    function getLines() {
+      return JSON.parse(localStorage.getItem('lines') || '{}');
+    }
+
+    function getPassedLines() {
+      const pass = JSON.parse(localStorage.getItem('passResults') || '[]');
+      const set = new Set();
+      pass.forEach(p => set.add(p.line));
+      return set;
+    }
+
+    function loadLines() {
+      const data = getLines();
+      const passedSet = getPassedLines();
+      const list = document.getElementById('lineList');
+      list.innerHTML = '';
+
+      Object.keys(data).forEach(line => {
+        const div = document.createElement('div');
+        div.className = 'line';
+        const passIcon = passedSet.has(line) ? "✅ " : "";
+        div.innerHTML = `
+          <strong>${passIcon}${line}</strong><br>
+          <em>${data[line]}</em>
+          <div class="edit-box">
+            <button onclick="editLine('${line}')">✏️ Sửa</button>
+            <button onclick="deleteLine('${line}')">🗑️ Xoá</button>
+          </div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function loadPassResults() {
+  const list = document.getElementById('passResults');
+  const data = JSON.parse(localStorage.getItem('passResults') || '[]');
+  list.innerHTML = '';
+
+  if (data.length === 0) {
+    list.innerHTML = '<i>Chưa có kết quả nào.</i>';
+    return;
+  }
+
+  data.reverse().forEach((item, index) => {
+    const container = document.createElement('div');
+    container.style.position = 'relative';
+    container.style.border = '1px solid #ccc';
+    container.style.marginTop = '10px';
+    container.style.padding = '10px';
+
+    const img = document.createElement('img');
+    img.src = item.image;
+    img.alt = "ảnh chụp";
+    img.style.width = "100%";
+    img.style.maxHeight = "300px";
+    img.style.display = "block";
+    img.style.borderRadius = "4px";
+
+    const info = document.createElement('div');
+    info.innerHTML = `
+      <strong>Dây chuyền:</strong> ${item.line}<br>
+      <strong>Thời gian:</strong> ${item.time}
+    `;
+    info.style.marginTop = "10px";
+
+    const delBtn = document.createElement('button');
+    delBtn.textContent = '🗑️';
+    delBtn.title = 'Xoá ảnh';
+    delBtn.style.position = 'absolute';
+    delBtn.style.top = '10px';
+    delBtn.style.right = '10px';
+    delBtn.style.padding = '3px 6px';
+    delBtn.style.fontSize = '12px';
+    delBtn.style.background = 'red';
+    delBtn.style.color = 'white';
+    delBtn.style.border = 'none';
+    delBtn.style.borderRadius = '3px';
+    delBtn.style.cursor = 'pointer';
+    delBtn.onclick = () => {
+      if (confirm('Bạn có chắc muốn xoá ảnh này?')) {
+        data.splice(data.length - 1 - index, 1); // vì đang reverse()
+        localStorage.setItem('passResults', JSON.stringify(data.reverse()));
+        loadPassResults();
+      }
+    };
+
+    container.appendChild(img);
+    container.appendChild(delBtn);
+    container.appendChild(info);
+    list.appendChild(container);
+  });
+}
+
+
+    function deletePassImage(indexToDelete) {
+      let data = JSON.parse(localStorage.getItem('passResults') || '[]');
+      data.splice(indexToDelete, 1);
+      localStorage.setItem('passResults', JSON.stringify(data));
+      loadPassResults();
+      loadLines();
+    }
+  </script>
+
+</body>
+</html>
