@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quét ký tự từ Camera</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <style>
+  body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+    margin: 0;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  h2, h3 {
+    text-align: center;
+  }
+
+  input, select, button, textarea {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    font-size: 16px;
+    box-sizing: border-box;
+  }
+
+  video {
+    width: 100%;
+    height: auto;
+    margin-top: 15px;
+    border-radius: 6px;
+  }
+
+  canvas {
+    display: none;
+  }
+
+  #result {
+    margin-top: 20px;
+    padding: 10px;
+    border: 1px dashed #999;
+    word-break: break-word;
+    font-size: 15px;
+    background: #f9f9f9;
+  }
+
+  .pass {
+    color: green;
+    font-weight: bold;
+    text-align: center;
+  }
+
+  .fail {
+    color: red;
+    font-weight: bold;
+    text-align: center;
+  }
+
+  @media (max-width: 480px) {
+    input, select, button, textarea {
+      font-size: 14px;
+      padding: 8px;
+    }
+
+    body {
+      padding: 10px;
+    }
+  }
+</style>
+
+</head>
+<body>
+
+  <h2>OCR kiểm tra ký tự theo dây chuyền</h2>
+
+  <label for="lineSelect">Chọn dây chuyền:</label>
+  <select id="lineSelect"></select>
+
+  <video id="video" autoplay playsinline width="100%" style="border:1px solid #ccc;"></video>
+  <button onclick="captureAndScan()">📸 Chụp và quét</button>
+
+  <canvas id="canvas" style="display:none;"></canvas>
+
+  <div class="result" id="result"></div>
+  <div>
+    <p><strong>Văn bản quét được:</strong></p>
+    <pre id="ocrText"></pre>
+  </div>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const resultDiv = document.getElementById('result');
+    const ocrTextDiv = document.getElementById('ocrText');
+    const lineSelect = document.getElementById('lineSelect');
+
+    const lines = JSON.parse(localStorage.getItem('lines') || '{}');
+    Object.keys(lines).forEach(line => {
+      const opt = document.createElement('option');
+      opt.value = line;
+      opt.textContent = line;
+      lineSelect.appendChild(opt);
+    });
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then(stream => video.srcObject = stream)
+      .catch(err => alert("Không thể truy cập camera: " + err));
+
+    async function captureAndScan() {
+      const selectedLine = lineSelect.value;
+      if (!selectedLine) {
+        alert("Vui lòng chọn dây chuyền.");
+        return;
+      }
+
+      const textSample = lines[selectedLine];
+      resultDiv.innerHTML = "⏳ Đang xử lý...";
+      ocrTextDiv.textContent = "";
+
+      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageDataUrl = canvas.toDataURL('image/png');
+
+      const { data: { text } } = await Tesseract.recognize(imageDataUrl, 'eng+vie');
+      const cleanedOCR = text.trim().replace(/\s+/g, " ").toLowerCase();
+ocrTextDiv.textContent = text;
+
+// Tách các từ khóa nhập bởi admin
+const keywords = textSample.toLowerCase().split(',').map(s => s.trim()).filter(s => s);
+
+// Kiểm tra nếu OCR chứa ít nhất 1 từ khóa thì PASS
+const matched = keywords.every(keyword => cleanedOCR.includes(keyword));
+
+if (matched) {
+  resultDiv.innerHTML = `✅ <span class='pass'>PASS</span> – Dây chuyền: <b>${selectedLine}</b>`;
+  const timestamp = new Date().toLocaleString();
+  const passData = JSON.parse(localStorage.getItem('passResults') || '[]');
+  passData.push({
+    line: selectedLine,
+    time: timestamp,
+    image: imageDataUrl
+  });
+  localStorage.setItem('passResults', JSON.stringify(passData));
+} else {
+  resultDiv.innerHTML = `❌ <span class='fail'>FAIL</span> – Dây chuyền: <b>${selectedLine}</b>`;
+}
+    }
+  </script>
+
+</body>
+</html>
